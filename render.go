@@ -93,61 +93,47 @@ func (q *RenderQuery) Request(ctx context.Context) (RenderResponse, error) {
 	}
 
 	for _, metrics := range pb_response.Metrics {
-		data := make([]float64, len(metrics.Values))
-		for i := range metrics.Values {
-			if metrics.IsAbsent[i] {
-				data[i] = math.NaN()
-			} else {
-				data[i] = metrics.Values[i]
-			}
-		}
 		response[metrics.GetName()] = &Points{
 			StartTime: metrics.StartTime,
 			StopTime:  metrics.StopTime,
 			StepTime:  metrics.StepTime,
+			Values:    metrics.Values,
+			IsAbsent:  metrics.IsAbsent,
 		}
 	}
 
 	return response, nil
 }
 
-// func (t *RenderTarget) String() string {
-// 	return t.str
-// }
+// GetLastNonNullValue searches for the latest non null value, and skips at most maxNullPoints.
+// If the last maxNullPoints values are all absent, returns absent
+func GetLastNonNullValue(pp *Points, maxNullPoints int) (t int32, v float64, absent bool) {
+	l := len(pp.Values)
 
-// func NewRenderTarget(seriesList string) *RenderTarget {
-// 	return &RenderTarget{
-// 		str: seriesList,
-// 	}
-// }
+	if l == 0 {
+		// there is values, we should return absent
+		v = 0
+		t = pp.StopTime
+		absent = true
+		return t, v, absent
+	}
 
-// func (t *RenderTarget) ApplyFunction(name string, args ...interface{}) *RenderTarget {
-// 	tmp := make([]string, len(args)+1)
-// 	tmp[0] = t.String()
-// 	for i, a := range args {
-// 		tmp[i+1] = fmt.Sprintf("%v", a)
-// 	}
-// 	t.str = fmt.Sprintf("%s(%s)", name, strings.Join(tmp, ","))
-// 	return t
-// }
+	for i := 0; i < maxNullPoints && i < l; i++ {
+		if pp.IsAbsent[l-1-i] {
+			continue
+		}
+		v = pp.Values[l-1-i]
+		t = pp.StopTime - int32(i)*pp.StepTime
+		absent = false
+		return t, v, absent
+	}
 
-// func (t *RenderTarget) ApplyFunctionWithoutSeries(name string, args ...interface{}) *RenderTarget {
-// 	tmp := make([]string, len(args))
-// 	for i, a := range args {
-// 		tmp[i] = fmt.Sprintf("%v", a)
-// 	}
-// 	t.str = fmt.Sprintf("%s(%s)", name, strings.Join(tmp, ","))
-// 	return t
-// }
-
-//
-// function shortcuts, for code completion
-//
-
-// func (t *RenderTarget) SumSeries() *RenderTarget {
-// 	return t.ApplyFunction("sumSeries")
-// }
-
-// func (t *RenderTarget) ConstantLine(value interface{}) *RenderTarget {
-// 	return t.ApplyFunctionWithoutSeries("constantLine", value)
-// }
+	// if we get here, there are two cases
+	//   * maxNullPoints == 0, we didn't even enter the loop above
+	//   * maxNullPoints > 0, but we didn't find a non-null point in the loop
+	// in both cases, we return the last point's info
+	v = pp.Values[l-1]
+	t = pp.StopTime
+	absent = math.IsNaN(pp.Values[l-1])
+	return t, v, absent
+}
