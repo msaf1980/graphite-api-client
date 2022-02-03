@@ -18,6 +18,8 @@ type Response interface {
 // RenderQuery is used to build `/render/` query
 type RenderQuery struct {
 	Base          string // base url of graphite server
+	User          string // user
+	Password      string // password
 	Targets       []string
 	From          string
 	Until         string

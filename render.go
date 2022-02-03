@@ -22,6 +22,11 @@ func NewRenderQuery(base, from, until string, targets []string) *RenderQuery {
 	return q
 }
 
+func (q *RenderQuery) SetBasicAuth(username, password string) {
+	q.User = username
+	q.Password = password
+}
+
 func (q *RenderQuery) SetFrom(from string) *RenderQuery {
 	q.From = from
 	return q
@@ -86,6 +91,10 @@ func (q *RenderQuery) Request(ctx context.Context) (RenderResponse, error) {
 
 	if req, err = httpNewRequest("GET", q.URL().String(), nil); err != nil {
 		return nil, err
+	}
+
+	if len(q.User) > 0 {
+		q.SetBasicAuth(q.User, q.Password)
 	}
 
 	if err = httpDo(ctx, req, &pb_response); err != nil {
