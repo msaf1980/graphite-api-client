@@ -82,11 +82,10 @@ func (q *RenderQuery) URL() *url.URL {
 }
 
 // Request implements Query interface
-func (q *RenderQuery) Request(ctx context.Context) (RenderResponse, error) {
+func (q *RenderQuery) Request(ctx context.Context) ([]Series, error) {
 	var req *http.Request
 	var err error
 
-	response := make(RenderResponse)
 	pb_response := protov2.MultiFetchResponse{}
 
 	if req, err = httpNewRequest("GET", q.URL().String(), nil); err != nil {
@@ -101,14 +100,23 @@ func (q *RenderQuery) Request(ctx context.Context) (RenderResponse, error) {
 		return nil, err
 	}
 
+	response := make([]Series, len(pb_response.Metrics))
+
+	i := 0
 	for _, metrics := range pb_response.Metrics {
-		response[metrics.GetName()] = &Points{
+		for i := range metrics.Values {
+			if metrics.IsAbsent[i] {
+				metrics.Values[i] = math.NaN()
+			}
+		}
+		response[i] = Series{
+			Target:    metrics.Name,
 			StartTime: metrics.StartTime,
 			StopTime:  metrics.StopTime,
 			StepTime:  metrics.StepTime,
 			Values:    metrics.Values,
-			IsAbsent:  metrics.IsAbsent,
 		}
+		i++
 	}
 
 	return response, nil
@@ -116,19 +124,19 @@ func (q *RenderQuery) Request(ctx context.Context) (RenderResponse, error) {
 
 // GetLastNonNullValue searches for the latest non null value, and skips at most maxNullPoints.
 // If the last maxNullPoints values are all absent, returns absent
-func GetLastNonNullValue(pp *Points, maxNullPoints int) (t int32, v float64, absent bool) {
+func GetLastNonNullValue(pp *Series, maxNullPoints int) (t int32, v float64, absent bool) {
 	l := len(pp.Values)
 
 	if l == 0 {
 		// there is values, we should return absent
-		v = 0
+		v = math.NaN()
 		t = pp.StopTime
 		absent = true
 		return t, v, absent
 	}
 
 	for i := 0; i < maxNullPoints && i < l; i++ {
-		if pp.IsAbsent[l-1-i] {
+		if math.IsNaN(pp.Values[l-1-i]) {
 			continue
 		}
 		v = pp.Values[l-1-i]

@@ -26,13 +26,10 @@ type RenderQuery struct {
 	MaxDataPoints int
 }
 
-type Points struct {
+type Series struct {
+	Target    string
 	StartTime int32
 	StopTime  int32
 	StepTime  int32
 	Values    []float64
-	IsAbsent  []bool
 }
-
-// RenderResponse is response of `/render/` query
-type RenderResponse map[string]*Points
