@@ -96,6 +96,10 @@ func (e *RenderEval) SetBasicAuth(username, password string) {
 	e.q.SetBasicAuth(username, password)
 }
 
+func (e *RenderEval) String() string {
+	return e.eval
+}
+
 func (e *RenderEval) Eval(ctx context.Context) ([]types.EvalResult, error) {
 	if series, err := e.q.Request(ctx); err == nil {
 		results := make([]types.EvalResult, len(series))
