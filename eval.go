@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+
+	"github.com/msaf1980/graphite-api-client/types"
 )
 
 type EvalCmp int8
@@ -29,14 +31,6 @@ type RenderEval struct {
 	maxNullPoints int
 	cmp           EvalCmp
 	v             float64
-}
-
-type RenderEvalResult struct {
-	Name     string
-	T        int32
-	V        float64
-	Success  bool
-	IsAbsent bool
 }
 
 func splitEval(eval string) (string, EvalCmp, float64, error) {
@@ -102,9 +96,9 @@ func (e *RenderEval) SetBasicAuth(username, password string) {
 	e.q.SetBasicAuth(username, password)
 }
 
-func (e *RenderEval) Eval(ctx context.Context) ([]RenderEvalResult, error) {
+func (e *RenderEval) Eval(ctx context.Context) ([]types.EvalResult, error) {
 	if series, err := e.q.Request(ctx); err == nil {
-		results := make([]RenderEvalResult, len(series))
+		results := make([]types.EvalResult, len(series))
 		for i := 0; i < len(series); i++ {
 			results[i].Name = series[i].Target
 			results[i].T, results[i].V, results[i].IsAbsent = GetLastNonNullValue(&series[i], e.maxNullPoints)

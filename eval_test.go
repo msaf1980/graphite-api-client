@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/msaf1980/graphite-api-client/types"
 )
 
 func Test_splitEval(t *testing.T) {
@@ -136,7 +138,7 @@ func TestRenderEval_Eval(t *testing.T) {
 		until         string
 		maxNullPoints int
 
-		wantResult []RenderEvalResult
+		wantResult []types.EvalResult
 		wantErr    bool
 	}{
 		{
@@ -144,7 +146,7 @@ func TestRenderEval_Eval(t *testing.T) {
 			from:          "-1m",
 			until:         "now",
 			maxNullPoints: 2,
-			wantResult: []RenderEvalResult{
+			wantResult: []types.EvalResult{
 				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
 				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: false, IsAbsent: false},
 			},
@@ -155,7 +157,7 @@ func TestRenderEval_Eval(t *testing.T) {
 			from:          "-1m",
 			until:         "now",
 			maxNullPoints: 2,
-			wantResult: []RenderEvalResult{
+			wantResult: []types.EvalResult{
 				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
 				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
 			},
@@ -166,7 +168,7 @@ func TestRenderEval_Eval(t *testing.T) {
 			from:          "-1m",
 			until:         "now",
 			maxNullPoints: 2,
-			wantResult: []RenderEvalResult{
+			wantResult: []types.EvalResult{
 				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: true, IsAbsent: false},
 				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: false, IsAbsent: false},
 			},
@@ -177,7 +179,7 @@ func TestRenderEval_Eval(t *testing.T) {
 			from:          "-1m",
 			until:         "now",
 			maxNullPoints: 2,
-			wantResult: []RenderEvalResult{
+			wantResult: []types.EvalResult{
 				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: true, IsAbsent: false},
 				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
 			},
@@ -188,7 +190,7 @@ func TestRenderEval_Eval(t *testing.T) {
 			from:          "-1m",
 			until:         "now",
 			maxNullPoints: 2,
-			wantResult: []RenderEvalResult{
+			wantResult: []types.EvalResult{
 				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
 				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
 			},
