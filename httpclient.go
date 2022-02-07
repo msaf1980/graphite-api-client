@@ -2,6 +2,7 @@ package graphiteapi
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -82,9 +83,14 @@ func httpDo(ctx context.Context, req *http.Request, r Response) error {
 	if body, err = ioutil.ReadAll(resp.Body); err != nil {
 		return err
 	}
-	if err = r.Unmarshal(body); err != nil {
-		return err
+	if resp.StatusCode == 200 {
+		if err = r.Unmarshal(body); err != nil {
+			return err
+		}
+		return nil
+	} else if resp.StatusCode == 404 {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("request ended with status %d: %s", resp.StatusCode, string(body))
 }
