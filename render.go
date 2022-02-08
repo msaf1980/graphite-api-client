@@ -93,7 +93,7 @@ func (q *RenderQuery) Request(ctx context.Context) ([]Series, error) {
 	}
 
 	if len(q.User) > 0 {
-		q.SetBasicAuth(q.User, q.Password)
+		req.SetBasicAuth(q.User, q.Password)
 	}
 
 	if err = httpDo(ctx, req, &pb_response); err != nil {

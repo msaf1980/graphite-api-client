@@ -143,7 +143,17 @@ func (v *V2PB) writeBody(writer *bufio.Writer, name string, from, until, step ui
 	writer.Write(v.b2.Bytes())
 }
 
+var (
+	testUsername string = "test"
+	testPassword string = "test_pwd"
+)
+
 func renderTest(w http.ResponseWriter, r *http.Request) {
+	username, password, ok := r.BasicAuth()
+	if !ok || username != testUsername || password != testPassword {
+		http.Error(w, "not authorized", http.StatusUnauthorized)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "parse form error", http.StatusBadRequest)
 		return
@@ -214,6 +224,7 @@ func TestRenderQuery(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			render := NewRenderQuery(base, tt.from, tt.until, tt.targets)
+			render.SetBasicAuth(testUsername, testPassword)
 			if gotSeries, err := render.Request(ctx); err != nil {
 				t.Errorf("NewRenderQuery().Request(ctx) got err = %v", err)
 			} else if len(tt.want) != 0 && len(tt.want) != len(gotSeries) {
