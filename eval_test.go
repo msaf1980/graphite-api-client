@@ -127,6 +127,7 @@ func makeEvalTest(t *testing.T, from, until, eval string, maxNullPoints int, exp
 		if r.URL.Path != "/render/" {
 			t.Errorf("Path should be `/render/` but %s found", r.URL.Path)
 		}
+		w.Header().Set("Content-type", "application/json")
 		fmt.Fprintln(w, result)
 	}))
 	defer ts.Close()

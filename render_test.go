@@ -65,6 +65,7 @@ func makeRenderTest(t *testing.T, query *RenderQuery, expectedQuery, result stri
 		if r.URL.Path != "/render/" {
 			t.Errorf("Path should be `/render/` but %s found", r.URL.Path)
 		}
+		w.Header().Set("Content-type", "application/json")
 		fmt.Fprintln(w, result)
 	}))
 	defer ts.Close()

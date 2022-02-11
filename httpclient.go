@@ -83,10 +83,13 @@ func httpDo(ctx context.Context, req *http.Request) ([]byte, error) {
 	if body, err = ioutil.ReadAll(resp.Body); err != nil {
 		return nil, err
 	}
-	if resp.StatusCode == 200 {
-		return body, err
-	} else if resp.StatusCode == 404 {
+	if resp.StatusCode == 404 {
 		return nil, nil
+	} else if resp.StatusCode == 200 {
+		if resp.Header.Get("Content-type") == "application/json" {
+			return body, err
+		}
+		return nil, fmt.Errorf("request ended with status %d: %s", http.StatusInternalServerError, string(body))
 	}
 
 	return nil, fmt.Errorf("request ended with status %d: %s", resp.StatusCode, string(body))
