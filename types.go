@@ -26,10 +26,13 @@ type RenderQuery struct {
 	MaxDataPoints int
 }
 
+// DataPoint describes concrete point of time series.
+type DataPoint struct {
+	Value     float64
+	Timestamp int64
+}
+
 type Series struct {
-	Target    string
-	StartTime int32
-	StopTime  int32
-	StepTime  int32
-	Values    []float64
+	Target     string
+	DataPoints []DataPoint
 }
