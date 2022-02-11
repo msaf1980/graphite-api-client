@@ -78,11 +78,11 @@ func splitEval(eval string) (string, EvalCmp, float64, error) {
 	return "", EvalEq, 0.0, ErrCmpValueInvalid
 }
 
-func NewRenderEval(base, from, until, eval string, maxNullPoints int) (*RenderEval, error) {
+func NewRenderEval(base, from, until, eval string, maxDataPoints int, maxNullPoints int) (*RenderEval, error) {
 	if target, cmp, v, err := splitEval(eval); err == nil {
 		return &RenderEval{
 			eval:          eval,
-			q:             NewRenderQuery(base, from, until, []string{target}),
+			q:             NewRenderQuery(base, from, until, []string{target}, maxDataPoints),
 			cmp:           cmp,
 			v:             v,
 			maxNullPoints: maxNullPoints,

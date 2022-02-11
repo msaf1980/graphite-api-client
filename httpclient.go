@@ -70,7 +70,7 @@ func httpNewRequest(method string, url string, body io.Reader) (*http.Request, e
 }
 
 // httpDo wraps http.Client.Do(), fetches response and unmarshals into r
-func httpDo(ctx context.Context, req *http.Request, r Response) error {
+func httpDo(ctx context.Context, req *http.Request) ([]byte, error) {
 	req = req.WithContext(ctx)
 
 	var resp *http.Response
@@ -78,19 +78,16 @@ func httpDo(ctx context.Context, req *http.Request, r Response) error {
 	var err error
 
 	if resp, err = httpClient.Do(req); err != nil {
-		return err
+		return nil, err
 	}
 	if body, err = ioutil.ReadAll(resp.Body); err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode == 200 {
-		if err = r.Unmarshal(body); err != nil {
-			return err
-		}
-		return nil
+		return body, err
 	} else if resp.StatusCode == 404 {
-		return nil
+		return nil, nil
 	}
 
-	return fmt.Errorf("request ended with status %d: %s", resp.StatusCode, string(body))
+	return nil, fmt.Errorf("request ended with status %d: %s", resp.StatusCode, string(body))
 }

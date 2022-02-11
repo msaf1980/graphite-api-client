@@ -2,7 +2,7 @@ package types
 
 type EvalResult struct {
 	Name     string
-	T        int32
+	T        int64
 	V        float64
 	Success  bool
 	IsAbsent bool

@@ -10,42 +10,22 @@ func TestGetLastNonNullValue(t *testing.T) {
 		name          string
 		pp            Series
 		maxNullPoints int
-		wantT         int32
+		wantT         int64
 		wantV         float64
 		wantAbsent    bool
 	}{
 		{
-			name: "last (empty)",
-			pp: Series{
-				StartTime: 1643964240,
-				StopTime:  1643964240,
-				StepTime:  60,
-			},
+			name:          "last (empty)",
+			pp:            Series{},
 			maxNullPoints: 1,
-			wantT:         1643964240,
+			wantT:         0,
 			wantV:         math.NaN(),
 			wantAbsent:    true,
 		},
 		{
 			name: "last (NaN)",
 			pp: Series{
-				StartTime: 1643964240,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{math.NaN()},
-			},
-			maxNullPoints: 1,
-			wantT:         1643964240,
-			wantV:         math.NaN(),
-			wantAbsent:    true,
-		},
-		{
-			name: "last (NaN)",
-			pp: Series{
-				StartTime: 1643964240,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{math.NaN()},
+				DataPoints: []DataPoint{{Value: math.NaN(), Timestamp: 1643964240}},
 			},
 			maxNullPoints: 1,
 			wantT:         1643964240,
@@ -55,10 +35,7 @@ func TestGetLastNonNullValue(t *testing.T) {
 		{
 			name: "last [10.0]",
 			pp: Series{
-				StartTime: 1643964240,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{10.0},
+				DataPoints: []DataPoint{{Value: 10.0, Timestamp: 1643964240}},
 			},
 			maxNullPoints: 1,
 			wantT:         1643964240,
@@ -68,23 +45,23 @@ func TestGetLastNonNullValue(t *testing.T) {
 		{
 			name: "last [10.0, 5.0]",
 			pp: Series{
-				StartTime: 1643964180,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{10.0, 5.0},
+				DataPoints: []DataPoint{
+					{Value: 10.0, Timestamp: 1643964180},
+					{Value: 5.1, Timestamp: 1643964240},
+				},
 			},
 			maxNullPoints: 1,
 			wantT:         1643964240,
-			wantV:         5.0,
+			wantV:         5.1,
 			wantAbsent:    false,
 		},
 		{
 			name: "last maxNullPoints=1 [10.0, NaN]",
 			pp: Series{
-				StartTime: 1643964180,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{10.0, math.NaN()},
+				DataPoints: []DataPoint{
+					{Value: 10.0, Timestamp: 1643964180},
+					{Value: math.NaN(), Timestamp: 1643964240},
+				},
 			},
 			maxNullPoints: 1,
 			wantT:         1643964240,
@@ -94,10 +71,10 @@ func TestGetLastNonNullValue(t *testing.T) {
 		{
 			name: "last maxNullPoints=2 [10.0, NaN]",
 			pp: Series{
-				StartTime: 1643964180,
-				StopTime:  1643964240,
-				StepTime:  60,
-				Values:    []float64{10.0, math.NaN()},
+				DataPoints: []DataPoint{
+					{Value: 10.0, Timestamp: 1643964180},
+					{Value: math.NaN(), Timestamp: 1643964240},
+				},
 			},
 			maxNullPoints: 2,
 			wantT:         1643964180,

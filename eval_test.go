@@ -1,11 +1,14 @@
 package graphiteapi
 
 import (
-	"bufio"
 	"context"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/msaf1980/graphite-api-client/types"
@@ -75,13 +78,13 @@ func Test_splitEval(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.eval, func(t *testing.T) {
-			gotTargets, gotEvalCmp, gotV, err := splitEval(tt.eval)
+			gotTarget, gotEvalCmp, gotV, err := splitEval(tt.eval)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("splitEval() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(gotTargets, tt.wantTarget) {
-				t.Errorf("splitEval() got = %v, want %v", gotTargets, tt.wantTarget)
+			if !reflect.DeepEqual(gotTarget, tt.wantTarget) {
+				t.Errorf("splitEval() got = %v, want %v", gotTarget, tt.wantTarget)
 			}
 			if gotEvalCmp != tt.wantEvalCmp {
 				t.Errorf("splitEval() got1 = %v, want %v", gotEvalCmp, tt.wantEvalCmp)
@@ -93,125 +96,209 @@ func Test_splitEval(t *testing.T) {
 	}
 }
 
-func renderEvalTest(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "parse form error", http.StatusBadRequest)
-		return
+func compareEvalResult(t *testing.T, res, want []types.EvalResult) {
+	maxLen := len(res)
+	if maxLen < len(want) {
+		maxLen = len(want)
 	}
-	targets := r.Form.Get("target")
-	from := r.Form.Get("from")
-	until := r.Form.Get("until")
-	format := r.Form.Get("format")
-
-	if format == "protobuf" {
-		pb := V2PB{}
-		pb.initBuffer()
-		writer := bufio.NewWriterSize(w, 1024*1024)
-		defer writer.Flush()
-
-		if from == "-5m" || until == "now" {
-			if targets == "TEST.*" {
-				pb.writeBody(writer, "TEST.1", 1643964180, 1643964240, 60, []float64{10.0, 5.0})
-				pb.writeBody(writer, "TEST.2", 1643964180, 1643964240, 60, []float64{1.0, 2.0})
+	for i := 0; i < maxLen; i++ {
+		if i >= len(res) {
+			t.Errorf("- [%d] = %+v", i, want[i])
+		} else if i >= len(want) {
+			t.Errorf("+ [%d] = %+v", i, res[i])
+		} else {
+			if res[i].T != want[i].T || res[i].Success != want[i].Success || res[i].IsAbsent != want[i].IsAbsent {
+				t.Errorf("- [%d] = %+v", i, want[i])
+				t.Errorf("+ [%d] = %+v", i, res[i])
+			} else if res[i].V != want[i].V && !(math.IsNaN(res[i].V) && math.IsNaN(want[i].V)) {
+				t.Errorf("- [%d] = %+v", i, want[i])
+				t.Errorf("+ [%d] = %+v", i, res[i])
 			}
 		}
-	} else {
-		http.Error(w, "invalid format", http.StatusBadRequest)
 	}
 }
 
-func TestRenderEval_Eval(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/render/", renderEvalTest)
-	ts := httptest.NewServer(mux)
+func makeEvalTest(t *testing.T, from, until, eval string, maxNullPoints int, expectedQuery, result string, wantEval []types.EvalResult) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parsedQuery, _ := url.ParseQuery(expectedQuery)
+		if !reflect.DeepEqual(r.URL.Query(), parsedQuery) {
+			t.Errorf("Expected query is %+v but %+v got", parsedQuery, r.URL.Query())
+		}
+		if r.URL.Path != "/render/" {
+			t.Errorf("Path should be `/render/` but %s found", r.URL.Path)
+		}
+		fmt.Fprintln(w, result)
+	}))
 	defer ts.Close()
 
-	initV2PB()
-
+	var res []types.EvalResult
 	base := "http://" + ts.Listener.Addr().String()
-
-	ctx := context.Background()
-
-	tests := []struct {
-		eval          string
-		from          string
-		until         string
-		maxNullPoints int
-
-		wantResult []types.EvalResult
-		wantErr    bool
-	}{
-		{
-			eval:          "TEST.*<2",
-			from:          "-1m",
-			until:         "now",
-			maxNullPoints: 2,
-			wantResult: []types.EvalResult{
-				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
-				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: false, IsAbsent: false},
-			},
-			wantErr: false,
-		},
-		{
-			eval:          "TEST.*<=2.0",
-			from:          "-1m",
-			until:         "now",
-			maxNullPoints: 2,
-			wantResult: []types.EvalResult{
-				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
-				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
-			},
-			wantErr: false,
-		},
-		{
-			eval:          "TEST.*>2.0",
-			from:          "-1m",
-			until:         "now",
-			maxNullPoints: 2,
-			wantResult: []types.EvalResult{
-				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: true, IsAbsent: false},
-				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: false, IsAbsent: false},
-			},
-			wantErr: false,
-		},
-		{
-			eval:          "TEST.*>=2.0",
-			from:          "-1m",
-			until:         "now",
-			maxNullPoints: 2,
-			wantResult: []types.EvalResult{
-				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: true, IsAbsent: false},
-				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
-			},
-			wantErr: false,
-		},
-		{
-			eval:          "TEST.*==2.0",
-			from:          "-1m",
-			until:         "now",
-			maxNullPoints: 2,
-			wantResult: []types.EvalResult{
-				{Name: "TEST.1", T: 1643964240, V: 5.0, Success: false, IsAbsent: false},
-				{Name: "TEST.2", T: 1643964240, V: 2.0, Success: true, IsAbsent: false},
-			},
-			wantErr: false,
-		},
+	e, err := NewRenderEval(base, from, until, eval, 0, maxNullPoints)
+	if err != nil {
+		t.Error(err)
+	} else {
+		res, err = e.Eval(context.Background())
+		if err == nil {
+			compareEvalResult(t, res, wantEval)
+		} else {
+			t.Error(err)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.eval, func(t *testing.T) {
-			e, err := NewRenderEval(base, tt.from, tt.until, tt.eval, tt.maxNullPoints)
-			if err == nil {
-				gotResult, err := e.Eval(ctx)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("RenderEval.Eval() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
-				if !reflect.DeepEqual(gotResult, tt.wantResult) {
-					t.Errorf("RenderEval.Eval() = %v, want %v", gotResult, tt.wantResult)
-				}
-			} else {
-				t.Errorf("RenderEval.Eval() error = %v", err)
-			}
+}
+
+var evalTestCases = []struct {
+	From          string
+	Until         string
+	Eval          string
+	MaxNullPoints int
+	ExpectedQuery string
+	Result        string
+	WantEval      []types.EvalResult
+}{
+	{
+		Eval:          "main* > 1.1",
+		MaxNullPoints: 1,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339855,
+				V:        math.NaN(),
+				Success:  false,
+				IsAbsent: true,
+			},
+			{
+				Name:     "main2",
+				T:        1468339855,
+				V:        math.NaN(),
+				Success:  false,
+				IsAbsent: true,
+			},
+		},
+	},
+	{
+		Eval:          "main* > 0.3",
+		MaxNullPoints: 2,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339854,
+				V:        2.0,
+				Success:  true,
+				IsAbsent: false,
+			},
+			{
+				Name:     "main2",
+				T:        1468339854,
+				V:        0.3,
+				Success:  false,
+				IsAbsent: false,
+			},
+		},
+	},
+	{
+		Eval:          "main* >= 0.3",
+		MaxNullPoints: 2,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339854,
+				V:        2.0,
+				Success:  true,
+				IsAbsent: false,
+			},
+			{
+				Name:     "main2",
+				T:        1468339854,
+				V:        0.3,
+				Success:  true,
+				IsAbsent: false,
+			},
+		},
+	},
+	{
+		Eval:          "main* == 0.3",
+		MaxNullPoints: 2,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339854,
+				V:        2.0,
+				Success:  false,
+				IsAbsent: false,
+			},
+			{
+				Name:     "main2",
+				T:        1468339854,
+				V:        0.3,
+				Success:  true,
+				IsAbsent: false,
+			},
+		},
+	},
+	{
+		Eval:          "main* < 0.3",
+		MaxNullPoints: 2,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339854,
+				V:        2.0,
+				Success:  false,
+				IsAbsent: false,
+			},
+			{
+				Name:     "main2",
+				T:        1468339854,
+				V:        0.3,
+				Success:  false,
+				IsAbsent: false,
+			},
+		},
+	},
+	{
+		Eval:          "main* <= 0.3",
+		MaxNullPoints: 2,
+		ExpectedQuery: "format=json&target=main*",
+		Result: "[{\"target\": \"main1\", \"datapoints\": [[1.1, 1468339853], [2, 1468339854], [null, 1468339855]]}," +
+			"{\"target\": \"main2\", \"datapoints\": [[1.0, 1468339853], [0.3, 1468339854], [null, 1468339855]]}]",
+		WantEval: []types.EvalResult{
+			{
+				Name:     "main1",
+				T:        1468339854,
+				V:        2.0,
+				Success:  false,
+				IsAbsent: false,
+			},
+			{
+				Name:     "main2",
+				T:        1468339854,
+				V:        0.3,
+				Success:  true,
+				IsAbsent: false,
+			},
+		},
+	},
+}
+
+func TestGraphiteClient_Eval(t *testing.T) {
+	for i, tt := range evalTestCases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			makeEvalTest(t, tt.From, tt.Until, tt.Eval, tt.MaxNullPoints, tt.ExpectedQuery, tt.Result, tt.WantEval)
 		})
 	}
 }
