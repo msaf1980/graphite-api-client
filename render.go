@@ -101,25 +101,4 @@ func (q *RenderQuery) Request(ctx context.Context) ([]Series, error) {
 		return []Series{}, err
 	}
 	return metrics, nil
-
-	// response := make([]Series, len(pb_response.Metrics))
-
-	// i := 0
-	// for _, metrics := range pb_response.Metrics {
-	// 	for i := range metrics.Values {
-	// 		if metrics.IsAbsent[i] {
-	// 			metrics.Values[i] = math.NaN()
-	// 		}
-	// 	}
-	// 	response[i] = Series{
-	// 		Target:    metrics.Name,
-	// 		StartTime: metrics.StartTime,
-	// 		StopTime:  metrics.StopTime,
-	// 		StepTime:  metrics.StepTime,
-	// 		Values:    metrics.Values,
-	// 	}
-	// 	i++
-	// }
-
-	// return response, nil
 }
