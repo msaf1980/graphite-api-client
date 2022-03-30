@@ -50,7 +50,11 @@ func TestNewClientFromString(t *testing.T) {
 	urlString := "http://domain.tld/path"
 	testRequest := NewRenderQuery(urlString, "-5min", "now", []string{"TEST.*", "TEST2.a*"}, 0)
 	shouldUrl := "http://domain.tld/path/render/?format=json&from=-5min&target=TEST.%2A&target=TEST2.a%2A&until=now"
-	gotUrl := testRequest.URL().String()
+	url, err := testRequest.URL()
+	if err != nil {
+		t.Fatalf("Resulting URL is nil, error is '%v'", err)
+	}
+	gotUrl := url.String()
 	if shouldUrl != gotUrl {
 		t.Errorf("Resulting URL is %v, \n but should be %v", gotUrl, shouldUrl)
 	}

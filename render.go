@@ -50,8 +50,11 @@ func (q *RenderQuery) SetMaxDataPoints(maxDataPoints int) *RenderQuery {
 }
 
 // URL implements Query interface
-func (q *RenderQuery) URL() *url.URL {
-	u, _ := url.Parse(q.Base + "/render/")
+func (q *RenderQuery) URL() (*url.URL, error) {
+	u, err := url.Parse(q.Base + "/render/")
+	if err != nil {
+		return nil, err
+	}
 	v := url.Values{}
 
 	// force set format to json
@@ -75,15 +78,19 @@ func (q *RenderQuery) URL() *url.URL {
 
 	u.RawQuery = v.Encode()
 
-	return u
+	return u, nil
 }
 
 // Request implements Query interface
 func (q *RenderQuery) Request(ctx context.Context) ([]Series, error) {
 	var req *http.Request
-	var err error
 
-	if req, err = httpNewRequest("GET", q.URL().String(), nil); err != nil {
+	url, err := q.URL()
+	if err != nil {
+		return nil, err
+	}
+
+	if req, err = httpNewRequest("GET", url.String(), nil); err != nil {
 		return nil, err
 	}
 
